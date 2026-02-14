@@ -1,22 +1,50 @@
+import os
+
 import requests
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import MarketOrderArgs, OrderType
-from py_clob_client.order_builder.constants import BUY
+from dotenv import load_dotenv
+
+try:
+    from py_clob_client.client import ClobClient
+    from py_clob_client.clob_types import MarketOrderArgs, OrderType
+    from py_clob_client.order_builder.constants import BUY
+except ModuleNotFoundError as exc:
+    if exc.name == "py_clob_client":
+        raise SystemExit(
+            "Missing dependency 'py_clob_client'.\n"
+            "Install with:\n"
+            "  python3 -m pip install -r requirements-polymarket.txt"
+        ) from exc
+    raise
+
+load_dotenv()
+
+
+def env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return float(value)
 
 
 #####################
 ### CONFIGURATION ###
 #####################
-TARGET_ADDRESS = "0x63ce342161250d705dc0b16df89036c8e5f9ba9a"
+TARGET_ADDRESS = os.getenv("POLYMARKET_TARGET_ADDRESS", "0x63ce342161250d705dc0b16df89036c8e5f9ba9a")
 
-FUNDER_ADDRESS = "0x11c6a04b48cca2d6435ca33421d0d73a74a83d41"
-PRIVATE_KEY = "0xdfa07c3693b5db6bb8e1b9a44d6b20c7ebceb6ee7a4df764d8fb38fde1f193d7"
-SIGNATURE_TYPE = 1    # 0=EOA (Wallets), 1=Email/Magic, 2=Browser proxy
+FUNDER_ADDRESS = os.getenv("POLYMARKET_FUNDER_ADDRESS", "0x11c6a04b48cca2d6435ca33421d0d73a74a83d41")
+PRIVATE_KEY = os.getenv("POLYMARKET_PRIVATE_KEY", "")
+SIGNATURE_TYPE = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))    # 0=EOA (Wallets), 1=Email/Magic, 2=Browser proxy
 
-BET_AMOUNT = 1.0            # Amount in $ to spend on each copied bet
+BET_AMOUNT = env_float("POLYMARKET_BET_AMOUNT", 1.0)            # Amount in $ to spend on each copied bet
 
-#DRY_RUN = True              # True = preview only, False = execute bets
-DRY_RUN = False
+DRY_RUN = env_bool("POLYMARKET_DRY_RUN", True)              # True = preview only, False = execute bets
 FILTER_BITCOIN_UP_DOWN = True
 BITCOIN_UP_DOWN_PREFIX = "Bitcoin Up or Down"
 SHOW_TARGET_POSITION_BETS = True
@@ -125,6 +153,14 @@ def place_bet(client, token_id: str, amount: float):
 ### MAIN ###
 ############
 def main():
+    if not PRIVATE_KEY:
+        raise SystemExit(
+            "Missing POLYMARKET_PRIVATE_KEY environment variable.\n"
+            "Set it in a .env file or export it in your shell.\n"
+            "Example .env line:\n"
+            "  POLYMARKET_PRIVATE_KEY=0x..."
+        )
+
     target_name = get_profile_name(TARGET_ADDRESS)
 
     print("\n" + "=" * 60)
